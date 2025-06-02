@@ -102,10 +102,11 @@ class Config:
         return x_pad, x_query, x_center, x_max
 
 
-BASE_DOWNLOAD_LINK = "https://huggingface.co/r3gm/sonitranslate_voice_models/resolve/main/"
+BASE_DOWNLOAD_LINK = "https://huggingface.co/NeoPy/rvc-base/resolve/main/"
 BASE_MODELS = [
     "hubert_base.pt",
-    "rmvpe.pt"
+    "rmvpe.pt",
+    "fcpe.pt",
 ]
 BASE_DIR = "."
 
@@ -260,6 +261,8 @@ class BaseLoader:
         self.only_cpu = only_cpu
         self.hubert_path = hubert_path
         self.rmvpe_path = rmvpe_path
+        self.rmvpe_path = rmvpe_path
+        self.fcpe_path = fcpe_path
 
     def apply_conf(
         self,
@@ -704,11 +707,33 @@ class BaseLoader:
                     except Exception as error:
                         logger.error(f"f0 file: {str(error)}")
 
+
+                if "fcpe" in f0_method:
+                    if not self.model_pitch_estimator:
+                        from infer_rvc_python.lib.fcpe import FCPEF0Predictor
+
+                        logger.info("Loading FCPE vocal pitch estimator model")
+                        if self.fcpe_path is None:
+                            self.fcpe_path = ""
+                        rm_local_path = "fcpe.pt"
+                        if os.path.exists(self.fcpe_path):
+                            rm_local_path = self.fcpe_path
+                        self.model_pitch_estimator = FCPEF0Predictor(
+                            f0_min=50,
+                            f0_max=1100,
+                            rm_local_path,
+                            dtype=torch.float32,
+                            device=self.config.device,
+                            sampling_rate=self.sr,
+                            threshold=0.03,
+                        )
+
+                    pipe.model_rmvpe = self.model_pitch_estimator
                 if "rmvpe" in f0_method:
                     if not self.model_pitch_estimator:
                         from infer_rvc_python.lib.rmvpe import RMVPE
 
-                        logger.info("Loading vocal pitch estimator model")
+                        logger.info("Loading RMVPE vocal pitch estimator model")
                         if self.rmvpe_path is None:
                             self.rmvpe_path = ""
                         rm_local_path = "rmvpe.pt"
